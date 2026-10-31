@@ -1051,23 +1051,6 @@ func TestSetConfigValueMCPServer(t *testing.T) {
 	}
 }
 
-func TestEnsureTelemetry(t *testing.T) {
-	cfg := &Config{}
-	if cfg.Telemetry != nil {
-		t.Fatal("Telemetry should be nil initially")
-	}
-	cfg.ensureTelemetry()
-	if cfg.Telemetry == nil {
-		t.Fatal("Telemetry should be non-nil after ensureTelemetry()")
-	}
-	cfg.ensureTelemetry()
-	if cfg.Telemetry == nil {
-		t.Fatal("Telemetry should remain non-nil on second call")
-	}
-}
-
-func TestSetConfigValueLlmURL(t *testing.T) {
-	cfg := &Config{}
 	if err := setConfigValue(cfg, "llm.url", "https://example.com/v1"); err != nil {
 		t.Fatalf("setConfigValue: %v", err)
 	}

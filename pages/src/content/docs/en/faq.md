@@ -303,21 +303,6 @@ the encoded path on the next run.
 
 ### How can I tell what tokens cost what?
 
-Enable telemetry:
-
-```bash
-ocr config set telemetry.enabled true
-ocr config set telemetry.exporter console
-ocr review
-```
-
-In the main review loop, LLM calls produce `llm.request` spans and are
-also recorded as metrics. Watch `ocr.llm.tokens_used` (counter, labelled `model` +
-`type`), `ocr.llm.requests_total` (counter, labelled `model` +
-`status`), and `ocr.llm.request_duration_seconds` (histogram, labelled
-`model`). The console exporter prints these aggregates inline. For
-dashboards, switch to the OTLP exporter and ship to your metrics
-stack — see [Telemetry](../telemetry/).
 
 ### Why are my reviews so expensive?
 
@@ -364,12 +349,6 @@ Common levers:
 OCR sends your **diffs** (and optional read-tool snippets) to whatever
 LLM endpoint you configured. Nothing else leaves your machine —
 session JSONLs and rule files are local-only.
-
-If telemetry is enabled, the `content_logging` flag is plumbed through
-the config layer but currently gates **no** code path — prompt and
-response content is never exported to your collector regardless of the
-flag's value. Treat it as reserved. Leave it `false` in production. See
-[Telemetry](../telemetry/#content-logging) for details.
 
 ### Can I redact secrets before they're sent to the LLM?
 
@@ -421,4 +400,3 @@ and per-user rules.
 - [Configuration](../configuration/) — LLM endpoint resolution and config keys.
 - [Review Rules](../review-rules/) — the file filter and rule resolution chain.
 - [Session Viewer](../viewer/) — inspect past review sessions.
-- [Telemetry](../telemetry/) — token usage and LLM metrics.

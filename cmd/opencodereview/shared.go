@@ -837,7 +837,6 @@ func emitRunResult(
 		telemetry.RecordCommentsGenerated(ctx, int64(len(comments)))
 	}
 
-	traceID := telemetry.TraceIDFromContext(ctx)
 	manifest := ag.RunManifest()
 
 	// JSON and SARIF are machine-readable formats written to stdout; they
@@ -846,7 +845,7 @@ func emitRunResult(
 
 	if machineReadable && manifest == nil && len(comments) == 0 && ag.FilesReviewed() == 0 {
 		if outputFormat == "json" {
-			return outputJSONNoFiles(traceID, llmIdentity, out)
+			return outputJSONNoFiles(llmIdentity, out)
 		}
 		return outputSARIF(nil, Version, ag.Warnings(), manifest, out)
 	}
@@ -883,7 +882,7 @@ func emitRunResult(
 		return outputJSONWithWarnings(comments, ag.Warnings(), ag.FilesReviewed(),
 			ag.TotalInputTokens(), ag.TotalOutputTokens(), ag.TotalTokensUsed(),
 			ag.TotalCacheReadTokens(), ag.TotalCacheWriteTokens(), duration,
-			ag.ProjectSummary(), ag.ToolCalls(), ag.ToolFailures(), traceID, resumeInfo, ag.SessionID(), manifest, ag.BudgetExceeded(), llmIdentity, out, retryReport, groups)
+			ag.ProjectSummary(), ag.ToolCalls(), ag.ToolFailures(), resumeInfo, ag.SessionID(), manifest, ag.BudgetExceeded(), llmIdentity, out, retryReport, groups)
 	}
 	if outputFormat == "sarif" {
 		return outputSARIF(comments, Version, ag.Warnings(), manifest, out)

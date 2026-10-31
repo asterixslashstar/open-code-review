@@ -160,7 +160,6 @@ make build
 │   ├── session/          # Review session management
 │   ├── stdout/           # Swappable stdout writer
 │   ├── suggestdiff/      # Line-level diffs for suggestion rendering
-│   ├── telemetry/        # OpenTelemetry integration
 │   ├── tool/             # Built-in tools (file_read, code_search, etc.)
 │   └── viewer/           # WebUI session viewer
 ├── npm/                  # Per-platform optional binary packages

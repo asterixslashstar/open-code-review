@@ -425,7 +425,6 @@ func (r *Runner) RunMainTask(ctx context.Context, messages []llm.Message, taskKe
 		// iteration's meta replaces the previous one instead of nesting.
 		reqCtx := r.requestCtx(ctx, taskKey, session.MainTask, rec.RequestNo)
 
-		_, llmSpan := telemetry.StartLLMSpan(ctx, r.deps.Model)
 		resp, err := r.deps.LLMClient.CompletionsWithCtx(reqCtx, llm.ChatRequest{
 			Model:     r.deps.Model,
 			Messages:  messages,
@@ -436,9 +435,6 @@ func (r *Runner) RunMainTask(ctx context.Context, messages []llm.Message, taskKe
 		duration := time.Since(startTime)
 		if err != nil {
 			rec.SetError(err, duration)
-			telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-			llmSpan.End()
-			telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, 0, "error")
 			return false, StopNone, fmt.Errorf("LLM completion error: %w", err)
 		}
 		rec.SetResponse(resp, duration)
@@ -450,9 +446,6 @@ func (r *Runner) RunMainTask(ctx context.Context, messages []llm.Message, taskKe
 			atomic.AddInt64(&r.totalCacheReadTokens, resp.Usage.CacheReadTokens)
 			atomic.AddInt64(&r.totalCacheWriteTokens, resp.Usage.CacheWriteTokens)
 		}
-		telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-		llmSpan.End()
-		telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, totalTokens, "ok")
 
 		content := resp.VisibleContent()
 		calls := resp.ToolCalls()
@@ -583,7 +576,6 @@ func (r *Runner) runGraceRound(ctx context.Context, messages []llm.Message, task
 	startTime := time.Now()
 	reqCtx := r.requestCtx(ctx, taskKey, session.MainTask, rec.RequestNo)
 
-	_, llmSpan := telemetry.StartLLMSpan(ctx, r.deps.Model)
 	resp, err := r.deps.LLMClient.CompletionsWithCtx(reqCtx, llm.ChatRequest{
 		Model:     r.deps.Model,
 		Messages:  messages,
@@ -594,9 +586,6 @@ func (r *Runner) runGraceRound(ctx context.Context, messages []llm.Message, task
 	duration := time.Since(startTime)
 	if err != nil {
 		rec.SetError(err, duration)
-		telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-		llmSpan.End()
-		telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, 0, "error")
 		fmt.Fprintf(stdout.Writer(), "[ocr] Grace round LLM error for %s: %v\n", taskKey, err)
 		return false
 	}
@@ -610,9 +599,6 @@ func (r *Runner) runGraceRound(ctx context.Context, messages []llm.Message, task
 		atomic.AddInt64(&r.totalCacheReadTokens, resp.Usage.CacheReadTokens)
 		atomic.AddInt64(&r.totalCacheWriteTokens, resp.Usage.CacheWriteTokens)
 	}
-	telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-	llmSpan.End()
-	telemetry.RecordLLMRequest(ctx, r.deps.Model, duration, totalTokens, "ok")
 
 	calls := resp.ToolCalls()
 	if len(calls) == 0 {
@@ -711,8 +697,6 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 	args, err := parseToolArgs(call.Function.Arguments)
 	if err != nil {
 		errMsg := fmt.Sprintf("Error parsing tool arguments for %s: %v", toolName, err)
-		telemetry.PrintToolCallStarted(toolName, nil)
-		telemetry.PrintToolCallError(toolName, fmt.Errorf("%s", errMsg))
 		r.recordToolFailure(toolCallNumber, toolName, taskKey, errMsg,
 			rec, call.Function.Arguments, time.Since(callStarted))
 		return r.toolFailureResult(taskKey, toolName, errMsg)
@@ -721,9 +705,6 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 	startTime := time.Now()
 
 	if t == tool.CodeComment {
-		telemetry.PrintToolCallStarted(t.Name(), args)
-		_, toolSpan := telemetry.StartToolSpan(ctx, t.Name())
-
 		comments, repair, errMsg := tool.ParseCommentsWithPath(args, taskKey)
 		if repair != nil {
 			// The model sees a plain success, so this warning is the only record
@@ -738,12 +719,8 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 		if errMsg != "" {
 			dur := time.Since(startTime)
 			toolErr := fmt.Errorf("%s", errMsg)
-			telemetry.RecordToolResult(toolSpan, t.Name(), dur.Milliseconds(), toolErr)
-			toolSpan.End()
-			telemetry.RecordToolCall(ctx, t.Name(), dur, false)
 			r.recordToolFailure(toolCallNumber, toolName, taskKey, errMsg,
 				rec, call.Function.Arguments, dur)
-			telemetry.PrintToolCallError(t.Name(), toolErr)
 			return r.toolFailureResult(taskKey, toolName, errMsg)
 		}
 
@@ -826,26 +803,15 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 			asyncCtx := context.WithoutCancel(ctx)
 			toolName := t.Name()
 			pool.SubmitFor(taskKey, func() ([]model.LlmComment, error) {
-				defer func() {
-					dur := time.Since(startTime)
-					telemetry.RecordToolResult(toolSpan, toolName, dur.Milliseconds(), nil)
-					toolSpan.End()
-					telemetry.PrintToolCallFinished(toolName, dur)
-				}()
 				resolveAndCollect(asyncCtx)
 				return []model.LlmComment{}, nil
 			})
-			telemetry.RecordToolCall(asyncCtx, toolName, time.Since(startTime), true)
 			r.resetToolFailureStreak(taskKey, t.Name())
 			return tool.Of(tool.CommentSucceed)
 		}
 
 		resolveAndCollect(ctx)
 		dur := time.Since(startTime)
-		telemetry.RecordToolResult(toolSpan, t.Name(), dur.Milliseconds(), nil)
-		toolSpan.End()
-		telemetry.RecordToolCall(ctx, t.Name(), dur, true)
-		telemetry.PrintToolCallFinished(t.Name(), dur)
 		if rec != nil {
 			rec.AddToolResult(t.Name(), call.Function.Arguments, tool.CommentSucceed)
 		}
@@ -854,22 +820,15 @@ func (r *Runner) executeToolCall(ctx context.Context, taskKey string, call llm.T
 	}
 
 	// Synchronous path for all other tools
-	telemetry.PrintToolCallStarted(toolName, args)
-	_, toolSpan := telemetry.StartToolSpan(ctx, toolName)
 	result, err := p.Execute(ctx, args)
 	dur := time.Since(startTime)
 	ok := err == nil
-	telemetry.RecordToolResult(toolSpan, toolName, dur.Milliseconds(), err)
-	toolSpan.End()
-	telemetry.RecordToolCall(ctx, toolName, dur, ok)
 
 	if err != nil {
 		r.recordToolFailure(toolCallNumber, toolName, taskKey, err.Error(),
 			rec, call.Function.Arguments, dur)
-		telemetry.PrintToolCallError(toolName, err)
 		return r.toolFailureResult(taskKey, toolName, fmt.Sprintf("Error executing tool %s: %v", toolName, err))
 	}
-	telemetry.PrintToolCallFinished(toolName, dur)
 	if rec != nil {
 		rec.AddToolResult(toolName, call.Function.Arguments, result)
 	}

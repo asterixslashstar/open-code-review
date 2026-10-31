@@ -241,10 +241,6 @@ if countMessagesTokens(messages) > tokenLimit {
 
 各行は 1 つのイベントです: 送信された prompt、LLM レスポンス、ツール呼び出し、ツール結果、発行されたコメントなど。Web UI（`ocr viewer`）はこれらのファイルを直接読みます。データベースはなく、append-only のログだけです。UI ガイドとイベント schema は[セッションビューア](../viewer/)を参照してください。
 
-## テレメトリ
-
-テレメトリを有効にすると、agent は 3 つのパイプラインレベルの span を発行します（`review.run` はジョブ全体を包み、`diff.parse` は diff の読み込みを包み、レビューされた各グループにつき 1 つの `subtask.execute.group.<group-key>`）。加えて、各決定ポイントで短命な `event.<name>` span を発行します（`plan.skipped`、`token.threshold.exceeded`、`subtask.error`……）。メインレビュー ループでは、LLM リクエストとツール呼び出しが span を生成し、関連する測定値も metrics に記録されます。prompt とレスポンスの内容がテレメトリに添付されることは**決してありません**。`OCR_CONTENT_LOGGING` フラグは配線済みですが、現在はデッドコードです。完全な schema は[テレメトリ](../telemetry/)を参照してください。
-
 ## *自動化されない*もの
 
 一部の決定は意図的に手動のままにされています:

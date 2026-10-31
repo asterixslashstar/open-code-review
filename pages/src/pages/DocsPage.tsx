@@ -80,7 +80,6 @@ const sidebarTree: SidebarGroup[] = [
       { id: 'sb-tools', labelKey: 'docs.sidebar.tools', slug: 'tools' },
       { id: 'sb-mcp', labelKey: 'docs.sidebar.mcp', slug: 'mcp' },
       { id: 'sb-viewer', labelKey: 'docs.sidebar.viewer', slug: 'viewer' },
-      { id: 'sb-telemetry', labelKey: 'docs.sidebar.telemetry', slug: 'telemetry' },
       {
         id: 'sb-integrations',
         labelKey: 'docs.sidebar.integrations',

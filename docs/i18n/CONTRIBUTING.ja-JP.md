@@ -151,7 +151,6 @@ make build
 │   ├── session/          # レビューセッション管理
 │   ├── stdout/           # 切り替え可能な stdout ライター
 │   ├── suggestdiff/      # 提案表示用の行単位 diff
-│   ├── telemetry/        # OpenTelemetry統合
 │   ├── tool/             # 組み込みツール（file_read、code_searchなど）
 │   └── viewer/           # WebUIセッションビューアー
 ├── npm/                  # プラットフォーム別の optional バイナリパッケージ

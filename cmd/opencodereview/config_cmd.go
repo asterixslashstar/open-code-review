@@ -355,7 +355,6 @@ type Config struct {
 	CustomProviders map[string]ProviderEntry   `json:"custom_providers,omitempty"`
 	Llm             LlmConfig                  `json:"llm,omitempty"`
 	Language        string                     `json:"language,omitempty"`
-	Telemetry       *TelemetryConfig           `json:"telemetry,omitempty"`
 	MCPServers      map[string]MCPServerConfig `json:"mcp_servers,omitempty"`
 
 	unknownJSONFields map[string]json.RawMessage
@@ -373,16 +372,6 @@ type LlmConfig struct {
 	ExtraBody    map[string]any    `json:"extra_body,omitempty"`
 	ExtraHeaders map[string]string `json:"extra_headers,omitempty"`
 	RetryCodes   []int             `json:"retry_codes,omitempty"`
-
-	unknownJSONFields map[string]json.RawMessage
-}
-
-// TelemetryConfig holds telemetry-specific settings.
-type TelemetryConfig struct {
-	Enabled      bool   `json:"enabled,omitempty"`         // Master switch for telemetry
-	Exporter     string `json:"exporter,omitempty"`        // "console" or "otlp"
-	OTLPEndpoint string `json:"otlp_endpoint,omitempty"`   // OTLP collector address
-	ContentLog   bool   `json:"content_logging,omitempty"` // Include prompt/response content
 
 	unknownJSONFields map[string]json.RawMessage
 }
@@ -543,30 +532,6 @@ func (c LlmConfig) MarshalJSON() ([]byte, error) {
 	return mergeUnknownJSONFields(data, c.unknownJSONFields)
 }
 
-func (c *TelemetryConfig) UnmarshalJSON(data []byte) error {
-	type telemetryConfigAlias TelemetryConfig
-	var decoded telemetryConfigAlias
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		return err
-	}
-	unknown, err := collectUnknownJSONFields(data, jsonFieldNames(TelemetryConfig{}))
-	if err != nil {
-		return err
-	}
-	*c = TelemetryConfig(decoded)
-	c.unknownJSONFields = unknown
-	return nil
-}
-
-func (c TelemetryConfig) MarshalJSON() ([]byte, error) {
-	type telemetryConfigAlias TelemetryConfig
-	data, err := json.Marshal(telemetryConfigAlias(c))
-	if err != nil {
-		return nil, err
-	}
-	return mergeUnknownJSONFields(data, c.unknownJSONFields)
-}
-
 func loadOrCreateConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -621,10 +586,6 @@ var supportedConfigKeys = []string{
 	"llm.extra_headers",
 	"llm.retry_codes",
 	"language",
-	"telemetry.enabled",
-	"telemetry.exporter",
-	"telemetry.otlp_endpoint",
-	"telemetry.content_logging",
 }
 
 func setConfigValue(cfg *Config, key, value string) error {
@@ -761,27 +722,6 @@ func setConfigValue(cfg *Config, key, value string) error {
 			cfg.Llm.Protocol = llm.ProtocolOpenAIChatCompletions
 		}
 	case "language", "Language":
-		cfg.Language = value
-	case "telemetry.enabled", "telemetry.Enabled":
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid boolean for telemetry.enabled: %w", err)
-		}
-		cfg.ensureTelemetry()
-		cfg.Telemetry.Enabled = b
-	case "telemetry.exporter", "telemetry.Exporter":
-		cfg.ensureTelemetry()
-		cfg.Telemetry.Exporter = value
-	case "telemetry.otlp_endpoint", "telemetry.OTLPEndpoint":
-		cfg.ensureTelemetry()
-		cfg.Telemetry.OTLPEndpoint = value
-	case "telemetry.content_logging", "telemetry.ContentLog":
-		b, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid boolean for telemetry.content_logging: %w", err)
-		}
-		cfg.ensureTelemetry()
-		cfg.Telemetry.ContentLog = b
 	case "llm.extra_body", "llm.ExtraBody":
 		var m map[string]any
 		if err := json.Unmarshal([]byte(value), &m); err != nil {
@@ -1177,10 +1117,4 @@ func parseMCPHeaders(value string) (map[string]string, error) {
 		}
 	}
 	return m, nil
-}
-
-func (c *Config) ensureTelemetry() {
-	if c.Telemetry == nil {
-		c.Telemetry = &TelemetryConfig{}
-	}
 }

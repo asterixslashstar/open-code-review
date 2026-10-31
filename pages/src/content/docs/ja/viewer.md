@@ -245,9 +245,6 @@ JSONL トランスクリプトには、LLM に送信され LLM から受信し�
 - CI で `--audience agent --format json` の出力を一時的なパイプにリダイレクトし、一時的な
   `HOME` で実行して JSONL が永続化されないようにする。
 
-OpenTelemetry exporter は別の話です——prompt の内容をエクスポートされる trace に含めない方法については
-[テレメトリ](../telemetry/)を参照してください。
-
 ## ビューアが適さない場合
 
 - プログラムによる後処理（CI、ダッシュボード）には `ocr review --format json --audience agent` を使用します。

@@ -521,64 +521,6 @@ func TestEmitRunResult_NilQuietHandle(t *testing.T) {
 	_ = got
 }
 
-func TestEmitRunResult_JSONTraceIDFromContext(t *testing.T) {
-	tp := sdktrace.NewTracerProvider()
-	defer func() { _ = tp.Shutdown(context.Background()) }()
-	otel.SetTracerProvider(tp)
-
-	ctx, span := tp.Tracer("test").Start(context.Background(), "test-root")
-	wantTraceID := span.SpanContext().TraceID().String()
-	defer span.End()
-
-	ag := &mockResultProvider{
-		filesReviewed: 2,
-		inputTokens:   10,
-		outputTokens:  5,
-		totalTokens:   15,
-	}
-	got := captureStdout(t, func() {
-		err := emitRunResult(ctx, ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	var out jsonOutput
-	if err := json.Unmarshal([]byte(got), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if out.TraceID != wantTraceID {
-		t.Errorf("trace_id = %q, want %q", out.TraceID, wantTraceID)
-	}
-}
-
-func TestEmitRunResult_JSONNoFilesTraceID(t *testing.T) {
-	tp := sdktrace.NewTracerProvider()
-	defer func() { _ = tp.Shutdown(context.Background()) }()
-	otel.SetTracerProvider(tp)
-
-	ctx, span := tp.Tracer("test").Start(context.Background(), "test-root")
-	wantTraceID := span.SpanContext().TraceID().String()
-	defer span.End()
-
-	ag := &mockResultProvider{filesReviewed: 0}
-	got := captureStdout(t, func() {
-		err := emitRunResult(ctx, ag, nil, time.Now(), "json", "developer", nil, nil, os.Stdout, nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	var out jsonOutput
-	if err := json.Unmarshal([]byte(got), &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if out.Status != "skipped" {
-		t.Errorf("status = %q, want skipped", out.Status)
-	}
-	if out.TraceID != wantTraceID {
-		t.Errorf("trace_id = %q, want %q", out.TraceID, wantTraceID)
-	}
-}
-
 func TestEmitRunResult_JSONIncludesSessionID(t *testing.T) {
 	ag := &mockResultProvider{filesReviewed: 1, sessionID: "session-99"}
 	got := captureStdout(t, func() {

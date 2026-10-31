@@ -105,7 +105,6 @@ func TestInit_AlreadyInitializedWithShutdowns(t *testing.T) {
 func TestInit_DisabledByDefault(t *testing.T) {
 	initialized = false
 	shutdownFuncs = nil
-	tracerProvider = nil
 	meterProvider = nil
 
 	envKeys := []string{
@@ -121,7 +120,6 @@ func TestInit_DisabledByDefault(t *testing.T) {
 	defer func() {
 		initialized = false
 		shutdownFuncs = nil
-		tracerProvider = nil
 		meterProvider = nil
 	}()
 
@@ -134,7 +132,6 @@ func TestInit_DisabledByDefault(t *testing.T) {
 func TestInit_EnabledConsole(t *testing.T) {
 	initialized = false
 	shutdownFuncs = nil
-	tracerProvider = nil
 	meterProvider = nil
 
 	t.Setenv("OCR_ENABLE_TELEMETRY", "1")
@@ -152,16 +149,12 @@ func TestInit_EnabledConsole(t *testing.T) {
 		}
 		initialized = false
 		shutdownFuncs = nil
-		tracerProvider = nil
 		meterProvider = nil
 	}()
 
 	result := Init(context.Background())
 	if !result {
 		t.Error("expected true when telemetry is enabled")
-	}
-	if tracerProvider == nil {
-		t.Error("expected tracerProvider to be set")
 	}
 	if meterProvider == nil {
 		t.Error("expected meterProvider to be set")

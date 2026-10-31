@@ -148,7 +148,6 @@ open-code-review/
 │   ├── session/               # JSONL session writer
 │   ├── stdout/                # Quiet-able stdout writer
 │   ├── suggestdiff/           # Suggestion diff rendering
-│   ├── telemetry/             # OpenTelemetry config + helpers
 │   ├── tool/                  # Tool registry + provider impls
 │   └── viewer/                # Embedded HTTP UI for browsing review sessions
 ├── pages/                     # Website landing page and docs (separate React app)

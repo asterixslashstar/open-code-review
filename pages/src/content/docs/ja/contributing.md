@@ -144,7 +144,6 @@ open-code-review/
 │   ├── session/               # JSONL セッションライター
 │   ├── stdout/                # ミュート可能な stdout writer
 │   ├── suggestdiff/           # 提案 diff のレンダリング
-│   ├── telemetry/             # OpenTelemetry の設定 + ヘルパー
 │   ├── tool/                  # ツールレジストリ + provider の実装
 │   └── viewer/                # レビューセッションを閲覧する埋め込み HTTP UI
 ├── pages/                     # 公式サイトのランディングページとドキュメント（独立した React app）

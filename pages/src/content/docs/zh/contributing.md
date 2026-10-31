@@ -143,7 +143,6 @@ open-code-review/
 │   ├── session/               # JSONL 会话写入器
 │   ├── stdout/                # 可静音的 stdout writer
 │   ├── suggestdiff/           # 建议 diff 渲染
-│   ├── telemetry/             # OpenTelemetry 配置 + 辅助
 │   ├── tool/                  # 工具注册表 + provider 实现
 │   └── viewer/                # 浏览审查会话的内嵌 HTTP UI
 ├── pages/                     # 官网 Landing Page 与文档（独立 React app）

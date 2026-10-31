@@ -23,24 +23,6 @@ This document lists every location in the codebase that can send data off the lo
 
 ### 1.2 What Data Is Collected & Sent
 
-**Resource attributes** (attached to every span/metric):
-- Host name (`resource.WithHost()`)
-- OS type/version (`resource.WithOS()`)
-- Process name/PID/start time (`resource.WithProcess()`)
-- Environment variables matching OTEL patterns (`resource.WithFromEnv()`)
-
-**Metrics exported** (periodic batch, default interval per OTel SDK):
-| Metric Name | Type | Description | Data Sent |
-|-------------|------|-------------|-----------|
-| `ocr.review.duration_seconds` | Histogram | Total duration of a code review run | Duration in seconds |
-| `ocr.files_reviewed_total` | Counter | Number of files reviewed | Integer count |
-| `ocr.comments_generated_total` | Counter | Number of review comments generated | Integer count |
-| `ocr.llm.requests_total` | Counter | Total LLM API requests made | Count + model name + status |
-| `ocr.llm.tokens_used` | Counter | Tokens consumed by LLM requests | Integer count |
-| `ocr.llm.request_duration_seconds` | Histogram | Duration of individual LLM API requests | Duration + model name |
-| `ocr.tool.calls_total` | Counter | Total tool calls made | Count + tool name + success/failure |
-| `ocr.tool.execution_duration_seconds` | Histogram | Duration of tool executions | Duration + tool name + success/failure |
-
 **Trace spans exported** (batched):
 | Span Name Pattern | Where Emitted | Attributes Sent |
 |-------------------|---------------|-----------------|
@@ -215,7 +197,5 @@ CONTRIBUTING.md                              (telemetry directory mention)
 | Category | Files | Data Sent | Default State |
 |----------|-------|-----------|---------------|
 | **OpenTelemetry traces** | `internal/telemetry/**` + 10 callers | Spans with operation names, durations, file counts, model names, tool names, error messages | **OFF** (requires `OCR_ENABLE_TELEMETRY=1`) |
-| **OpenTelemetry metrics** | `internal/telemetry/metrics.go` + callers | Review duration, files reviewed, comments generated, LLM request counts/tokens/duration, tool call counts/duration | **OFF** (requires `OCR_ENABLE_TELEMETRY=1`) |
-| **Resource attributes** | `internal/telemetry/provider.go` | Host name, OS info, process info | **OFF** (only collected when telemetry is enabled) |
 | **NPM update checks** | `bin/ocr.js`, `scripts/update.js` | Package version comparison against npm registry | ON (can be disabled with `OCR_NO_UPDATE=1`) |
 | **Install scripts** | `install.sh`, `install.ps1` | GitHub release metadata (GET only) | ON (one-time, install-time only) |

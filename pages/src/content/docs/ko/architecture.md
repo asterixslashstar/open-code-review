@@ -378,18 +378,6 @@ OCR은 이 검사로 괴물 같은 diff(자동 생성된 lock 파일, 수천 줄
 데이터베이스는 없고 덧붙이기만 하는 로그뿐입니다. UI 둘러보기와 이벤트
 스키마는 [세션 뷰어](../viewer/)를 참고하세요.
 
-## 텔레메트리 {#telemetry}
-
-텔레메트리를 켜면 Agent는 파이프라인 수준의 스팬 세 종류를 내보냅니다. 작업
-전체를 감싸는 `review.run`, diff 로딩을 감싸는 `diff.parse`, 그리고 리뷰한
-그룹마다 하나씩 생기는 `subtask.execute.group.<group-key>`입니다. 여기에 결정
-지점마다 짧게 생겼다 사라지는 `event.<name>` 스팬(`plan.skipped`,
-`token.threshold.exceeded`, `subtask.error` 등)이 더해집니다. LLM 요청과 도구
-호출은 메인 리뷰 루프에서 스팬을 생성하며, 관련 측정값도 메트릭에 기록됩니다. 프롬프트와 응답 내용은
-텔레메트리에 **절대** 실리지 않습니다. `OCR_CONTENT_LOGGING` 플래그는 배선만 돼
-있고 지금은 동작하지 않습니다. 전체 스키마는
-[텔레메트리](../telemetry/)를 참고하세요.
-
 ## 자동화하지 *않은* 것 {#what-s-not-automated}
 
 일부러 사람 손에 남겨 둔 결정이 몇 가지 있습니다.

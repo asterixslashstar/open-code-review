@@ -11,20 +11,11 @@ import (
 
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	otlpmetricgrpc "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	otlpmetrichttp "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
-	otlptracegrpc "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	otlptracehttp "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	stdoutmetric "go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
-	stdouttrace "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 )
-
-// newStdoutTraceExporter creates a console trace exporter with pretty-print output.
-func newStdoutTraceExporter() (*stdouttrace.Exporter, error) {
-	return stdouttrace.New(stdouttrace.WithPrettyPrint())
-}
 
 // newStdoutMetricExporter creates a console metric exporter with pretty-print output.
 func newStdoutMetricExporter() (sdkmetric.Exporter, error) {
@@ -53,7 +44,7 @@ func parseOTLPEndpoint(endpoint string) (addr string, insecure bool) {
 //
 // OTEL_EXPORTER_OTLP_ENDPOINT is defined by the OpenTelemetry specification as a BASE
 // URL for the HTTP protocols, to which the per-signal path is appended: an endpoint of
-// "https://backend.example.com" sends traces to "https://backend.example.com/v1/traces".
+// "https://backend.example.com" sends metrics to "https://backend.example.com/v1/metrics".
 // WithEndpointURL, by contrast, takes the full signal URL — it assigns u.Path straight
 // to URLPath — so the signal path has to be appended here rather than left to the SDK.
 //
@@ -65,7 +56,7 @@ func parseOTLPEndpoint(endpoint string) (addr string, insecure bool) {
 //     so an existing configuration behaves identically after this change.
 //   - An endpoint that already names the signal path is left alone. Someone who worked
 //     around the missing path support by writing it out in full should not end up with
-//     "/v1/traces/v1/traces".
+//     "/v1/metrics/v1/metrics".
 func otlpSignalURL(endpoint, signalPath string) string {
 	base := endpoint
 	switch {
@@ -95,26 +86,9 @@ func initOTLPProviders(ctx context.Context, res *resource.Resource, cfg Config) 
 	}
 }
 
-// initOTLPGRPCProviders sets up OTLP gRPC exporters for traces and metrics.
+// initOTLPGRPCProviders sets up OTLP gRPC metric exporter.
 func initOTLPGRPCProviders(ctx context.Context, res *resource.Resource, cfg Config) {
 	addr, insecure := parseOTLPEndpoint(cfg.OTLPEndpoint)
-
-	traceOpts := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(addr)}
-	if insecure {
-		traceOpts = append(traceOpts, otlptracegrpc.WithInsecure())
-	}
-	traceExp, err := otlptracegrpc.New(ctx, traceOpts...)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ocr] WARNING: failed to create OTLP trace exporter: %v\n", err)
-		return
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExp),
-		sdktrace.WithResource(res),
-	)
-	tracerProvider = tp
-	shutdownFuncs = append(shutdownFuncs, func(ctx context.Context) error { return tp.Shutdown(ctx) })
 
 	metricOpts := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpoint(addr)}
 	if insecure {
@@ -134,37 +108,23 @@ func initOTLPGRPCProviders(ctx context.Context, res *resource.Resource, cfg Conf
 	shutdownFuncs = append(shutdownFuncs, func(ctx context.Context) error { return mp.Shutdown(ctx) })
 }
 
-// initOTLPHTTPProviders sets up OTLP HTTP exporters for traces and metrics.
+// initOTLPHTTPProviders sets up OTLP HTTP metric exporter.
 //
 // Unlike the gRPC path this uses WithEndpointURL rather than WithEndpoint, so that a
 // base path in OTEL_EXPORTER_OTLP_ENDPOINT is honoured. WithEndpoint takes a bare
-// host:port and cannot express a path, so every request went to /v1/traces at the root
+// host:port and cannot express a path, so every request went to /v1/metrics at the root
 // of the host regardless of what the endpoint said.
 //
 // That silently excludes any backend reached through a path prefix. Langfuse receives
 // OTLP at /api/public/otel, for instance, so an endpoint of
 // "http://langfuse:3000/api/public/otel" produced requests to
-// "http://langfuse:3000/v1/traces" and every span was dropped with a 404.
+// "http://langfuse:3000/v1/metrics" and every metric was dropped with a 404.
 //
 // The signal path is appended by otlpSignalURL rather than by the SDK: WithEndpointURL
 // assigns the URL's path straight to URLPath, so it expects the full signal URL, while
 // OTEL_EXPORTER_OTLP_ENDPOINT is specified as a base. It also derives TLS from the
 // scheme, which is what the separate WithInsecure call was doing by hand.
 func initOTLPHTTPProviders(ctx context.Context, res *resource.Resource, cfg Config) {
-	traceExp, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL(otlpSignalURL(cfg.OTLPEndpoint, "/v1/traces")))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ocr] WARNING: failed to create OTLP HTTP trace exporter: %v\n", err)
-		return
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExp),
-		sdktrace.WithResource(res),
-	)
-	tracerProvider = tp
-	shutdownFuncs = append(shutdownFuncs, func(ctx context.Context) error { return tp.Shutdown(ctx) })
-
 	metricExp, err := otlpmetrichttp.New(ctx,
 		otlpmetrichttp.WithEndpointURL(otlpSignalURL(cfg.OTLPEndpoint, "/v1/metrics")))
 	if err != nil {
@@ -180,21 +140,8 @@ func initOTLPHTTPProviders(ctx context.Context, res *resource.Resource, cfg Conf
 	shutdownFuncs = append(shutdownFuncs, func(ctx context.Context) error { return mp.Shutdown(ctx) })
 }
 
-// initConsoleProviders sets up stdout exporters for traces and metrics.
+// initConsoleProviders sets up stdout metric exporter.
 func initConsoleProviders(res *resource.Resource) {
-	traceExp, err := newStdoutTraceExporter()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ocr] WARNING: failed to create console trace exporter: %v\n", err)
-		return
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExp),
-		sdktrace.WithResource(res),
-	)
-	tracerProvider = tp
-	shutdownFuncs = append(shutdownFuncs, func(ctx context.Context) error { return tp.Shutdown(ctx) })
-
 	metricExp, err := newStdoutMetricExporter()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[ocr] WARNING: failed to create console metric exporter: %v\n", err)

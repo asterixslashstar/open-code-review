@@ -317,15 +317,11 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 	// provider prompt caches actually reuse prefixes at.
 	ctx = llm.ContextWithSessionKey(ctx, a.SessionID())
 
-	ctx, scanSpan := telemetry.StartSpan(ctx, "scan.enumerate")
 	provider := NewProvider(a.args.RepoDir, a.args.Paths, a.args.GitRunner, a.args.MaxFileSizeBytes)
 	items, err := provider.Enumerate(ctx)
 	if err != nil {
-		scanSpan.End()
 		return nil, fmt.Errorf("enumerate files: %w", err)
 	}
-	telemetry.SetAttr(scanSpan, "files.enumerated", len(items))
-	scanSpan.End()
 
 	a.items = items
 	a.injectScanContentMap()
@@ -342,7 +338,6 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 
 	if reviewable == 0 {
 		fmt.Fprintln(stdout.Writer(), "[ocr] No reviewable files. Skipping scan.")
-		telemetry.Event(ctx, "scan.no.files")
 		// A clean skip still has to reach disk: if session_end never persisted,
 		// the skip cannot be claimed. Scan has no manifest builder, but the
 		// session_end delivery contract still applies.
@@ -364,11 +359,6 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 	}
 
 	a.currentDate = time.Now().Format("2006-01-02 15:04")
-	telemetry.Event(ctx, "scan.started",
-		telemetry.AnyToAttr("file.count", totalDiscovered),
-		telemetry.AnyToAttr("review.count", reviewable),
-		telemetry.AnyToAttr("est.total.tokens", est.TotalTokens),
-		telemetry.AnyToAttr("repo.dir", a.args.RepoDir))
 	telemetry.RecordFilesReviewed(ctx, int64(reviewable))
 
 	comments, err := a.dispatchSubtasks(ctx)
@@ -761,9 +751,6 @@ func (a *Agent) dispatchBatch(ctx context.Context, batchIdx int, batch []model.S
 				atomic.AddInt64(&a.subtaskFailed, 1)
 				a.session.RecordReviewItemFailed(it.Path, it.Path, it.Path, fingerprint, err.Error())
 				fmt.Fprintf(stdout.Writer(), "[ocr] Scan subtask error for %s (batch #%d): %v\n", it.Path, batchIdx, err)
-				telemetry.ErrorEvent(fileCtx, "scan.subtask.error", err,
-					telemetry.AnyToAttr("file.path", it.Path),
-					telemetry.AnyToAttr("batch.index", batchIdx))
 				a.recordWarning("scan_subtask_error", it.Path, err.Error())
 				return
 			}
@@ -796,10 +783,6 @@ func (a *Agent) dispatchBatch(ctx context.Context, batchIdx int, batch []model.S
 // itself fails. Plan failure never blocks the main review — it falls back
 // to v1 (plan-less) behavior.
 func (a *Agent) executeSubtask(ctx context.Context, it model.ScanItem) (bool, string, error) {
-	ctx, span := telemetry.StartSpan(ctx, "scan.subtask."+it.Path)
-	defer span.End()
-	telemetry.SetAttr(span, "file.path", it.Path)
-
 	if ctx.Err() != nil {
 		return false, "", ctx.Err()
 	}
@@ -820,10 +803,6 @@ func (a *Agent) executeSubtask(ctx context.Context, it model.ScanItem) (bool, st
 		msg := fmt.Sprintf("prompt tokens (%d) exceed %d%% of max_tokens(%d)", tokenCount, 80, maxAllowed)
 		fmt.Fprintf(stdout.Writer(), "[ocr] WARNING: %s for %s\n", msg, it.Path)
 		a.recordWarning("token_threshold_exceeded", it.Path, msg)
-		telemetry.Event(ctx, "token.threshold.exceeded",
-			telemetry.AnyToAttr("file.path", it.Path),
-			telemetry.AnyToAttr("tokens", tokenCount),
-			telemetry.AnyToAttr("max_tokens", maxAllowed))
 		return false, msg, nil
 	}
 

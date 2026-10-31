@@ -150,7 +150,6 @@ make build
 │   ├── session/          # 评审会话管理
 │   ├── stdout/           # 可切换的 stdout 写入器
 │   ├── suggestdiff/      # 建议渲染用的行级 diff
-│   ├── telemetry/        # OpenTelemetry 集成
 │   ├── tool/             # 内置工具（file_read, code_search 等）
 │   └── viewer/           # WebUI 会话查看器
 ├── npm/                  # 各平台可选二进制包

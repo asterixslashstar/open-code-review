@@ -337,7 +337,6 @@ type jsonLLMIdentity struct {
 type jsonOutput struct {
 	Status         string                `json:"status"`
 	LLM            *jsonLLMIdentity      `json:"llm,omitempty"`
-	TraceID        string                `json:"trace_id,omitempty"`
 	Message        string                `json:"message,omitempty"`
 	Summary        *jsonSummary          `json:"summary,omitempty"`
 	ToolCalls      *jsonToolCalls        `json:"tool_calls"`
@@ -372,14 +371,13 @@ func outputJSON(comments []model.LlmComment) error {
 func outputJSONWithWarnings(comments []model.LlmComment, warnings []agent.AgentWarning,
 	filesReviewed, inputTokens, outputTokens, totalTokens, cacheReadTokens, cacheWriteTokens int64,
 	duration time.Duration, projectSummary string, toolCalls map[string]int64, toolFailures []llmloop.ToolFailureDetail,
-	traceID string, resumeInfo *agent.ResumeInfo, sessionID string,
+	resumeInfo *agent.ResumeInfo, sessionID string,
 	manifest *session.RunManifest, budgetExceeded bool, llmIdentity *jsonLLMIdentity, out io.Writer,
 	retryReport *llm.RetryReport, groups []agent.FileGroupInfo) error {
 	publishedWarnings := warningsForOutput(warnings, manifest)
 	payload := jsonOutput{
 		Status:   "success",
 		LLM:      llmIdentity,
-		TraceID:  traceID,
 		Comments: comments,
 		Summary: &jsonSummary{
 			FilesReviewed:    filesReviewed,
@@ -648,11 +646,10 @@ func manifestMessage(manifest *session.RunManifest, findings int) string {
 	}
 }
 
-func outputJSONNoFiles(traceID string, llmIdentity *jsonLLMIdentity, out io.Writer) error {
+func outputJSONNoFiles(llmIdentity *jsonLLMIdentity, out io.Writer) error {
 	payload := jsonOutput{
 		Status:    "skipped",
 		LLM:       llmIdentity,
-		TraceID:   traceID,
 		Message:   "No supported files changed.",
 		Comments:  []model.LlmComment{},
 		ToolCalls: newJSONToolCalls(nil, nil),

@@ -22,8 +22,6 @@ import (
 	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"github.com/spf13/cobra"
-
-	"go.opentelemetry.io/otel/codes"
 )
 
 type reviewOptions struct {
@@ -251,22 +249,9 @@ func executeReviewContext(ctx context.Context, opts reviewOptions) (retErr error
 	q := newQuietHandle(opts.outputFormat, opts.audience)
 	defer q.Restore()
 
-	runCtx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(ctx), "review.run")
-	defer span.End()
-	telemetry.SetAttr(span, "review.repo", cc.RepoDir)
-	telemetry.SetAttr(span, "review.from", opts.from)
-	telemetry.SetAttr(span, "review.to", opts.to)
-	telemetry.SetAttr(span, "review.model", rt.Model)
-	var traceID string
-	if telemetry.IsEnabled() {
-		traceID = telemetry.TraceIDFromContext(ctx)
-		if !isMachineReadable(opts.outputFormat) {
-			fmt.Fprintf(os.Stderr, "[ocr] TraceID: %s\n", traceID)
-		}
-	}
 	startTime := time.Now()
 
-	comments, runErr := ag.Run(runCtx)
+	comments, runErr := ag.Run(ctx)
 	manifest := ag.RunManifest()
 
 	// Freeze the retry report at the same boundary as the manifest: ag.Run has

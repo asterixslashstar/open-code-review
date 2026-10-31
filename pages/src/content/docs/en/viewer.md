@@ -286,10 +286,6 @@ either:
 - redirect `--audience agent --format json` output to a transient pipe
   in CI and run with a temporary `HOME` so the JSONL never persists.
 
-The OpenTelemetry exporter is a separate concern — see
-[Telemetry](../telemetry/) for how to keep prompt content out of
-exported traces.
-
 ## When the viewer is not the right tool
 
 - For programmatic post-processing (CI, dashboards), use

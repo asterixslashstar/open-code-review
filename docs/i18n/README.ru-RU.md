@@ -190,7 +190,6 @@ ocr delegate rule src/main.go src/handler.go
   - [Режим делегирования](https://open-codereview.ai/docs/delegate) — кодинг-агент выполняет ревью с помощью собственной LLM; API-ключ для OCR не требуется
 - [Интеграция с CI/CD](https://open-codereview.ai/docs/cicd) — GitHub Actions, GitLab CI, GitFlic CI и Gerrit
 - [Просмотр сессий](https://open-codereview.ai/docs/viewer) — просмотр и воспроизведение сессий ревью в браузере, отметка комментариев как исправленных/игнорируемых и их скрытие
-- [Телеметрия](https://open-codereview.ai/docs/telemetry) — интеграция с OpenTelemetry для наблюдаемости
 - [FAQ](https://open-codereview.ai/docs/faq) — частые вопросы и устранение неполадок
 
 ## Участие в разработке

@@ -272,19 +272,6 @@ manifest-less の no-files 経路はより簡素で、`summary` と `manifest` �
 
 ### どの token にどれだけ費やしたかを知るには？
 
-テレメトリを有効にします。
-
-```bash
-ocr config set telemetry.enabled true
-ocr config set telemetry.exporter console
-ocr review
-```
-
-メインレビュー ループの LLM 呼び出しは `llm.request` span を生成し、metric としても記録されます。`ocr.llm.tokens_used`
-（counter、`model` + `type` でラベル付け）、`ocr.llm.requests_total`（counter、`model`
-+ `status` でラベル付け）、`ocr.llm.request_duration_seconds`（histogram、`model` でラベル付け）に
-注目してください。console exporter はこれらの集計をインラインで出力します。ダッシュボードが必要な場合は、
-OTLP exporter に切り替えて metrics 基盤に送ってください——[テレメトリ](../telemetry/)を参照。
 
 ### なぜ私のレビューはこんなに高価なのか？
 
@@ -323,10 +310,6 @@ OCR はあなたの **diff**（および任意の read-tool スニペット）�
 それ以外のものは一切あなたのマシンから出ません——セッション JSONL とルールファイルはローカルにのみ
 存在します。
 
-テレメトリを有効にしている場合、`content_logging` フラグは設定レイヤーに接続されていますが、
-現時点ではどのコードパスも**制御しません**——このフラグの値にかかわらず、prompt と応答の内容が
-collector にエクスポートされることは決してありません。予約項目とみなしてください。本番環境では
-`false` のままにしてください。詳細は[テレメトリ](../telemetry/#content-logging)を参照してください。
 
 ### LLM に送る前に secret をマスクできるか？
 
@@ -374,4 +357,3 @@ OCR は `~/.opencodereview` の外には書き込みません（NPM がダウン
 - [設定](../configuration/)——LLM エンドポイント解決と config key。
 - [レビュールール](../review-rules/)——ファイルフィルターとルール解決チェーン。
 - [セッションビューア](../viewer/)——過去のレビューセッションを表示する。
-- [テレメトリ](../telemetry/)——token 使用量と LLM メトリクス。

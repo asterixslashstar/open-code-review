@@ -148,7 +148,7 @@ open-code-review/
 │   ├── session/               # JSONL 세션 기록기
 │   ├── stdout/                # 조용히 만들 수 있는 stdout 기록기
 │   ├── suggestdiff/           # 제안 diff 렌더링
-│   ├── telemetry/             # OpenTelemetry 설정과 헬퍼
+
 │   ├── tool/                  # 도구 레지스트리와 프로바이더 구현
 │   └── viewer/                # 리뷰 세션을 탐색하는 내장 HTTP UI
 ├── pages/                     # 공식 웹사이트 랜딩 페이지와 문서(별도 React 앱)

@@ -34,9 +34,6 @@ import (
 	"github.com/alibaba/open-code-review/internal/stdout"
 	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
-
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 )
 
 // AgentWarning is re-exported from llmloop for backwards compatibility with
@@ -288,9 +285,7 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 	ctx = llm.ContextWithSessionKey(ctx, a.SessionID())
 
 	// Step 1: Parse diffs
-	ctx, diffSpan := telemetry.StartSpan(ctx, "diff.parse")
 	if err := a.loadDiffs(ctx); err != nil {
-		diffSpan.End()
 		// The builder already exists (agent.New created session + manifest), but
 		// no item was selected yet. Record the run-level input failure at this
 		// trigger point, then finalize and persist so the run still emits a
@@ -311,10 +306,6 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 		}
 		return nil, loadErr
 	}
-	telemetry.SetAttr(diffSpan, "files.changed", len(a.diffs))
-	telemetry.SetAttr(diffSpan, "lines.inserted", int64(a.totalInsertions))
-	telemetry.SetAttr(diffSpan, "lines.deleted", int64(a.totalDeletions))
-	diffSpan.End()
 
 	// Build the read-only DiffMap from ALL parsed diffs (before filtering)
 	// so the LLM can query diffs of related but filtered-out files.
@@ -346,10 +337,6 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 		case len(kept) > 0:
 			skipReason = "deleted"
 		}
-		telemetry.Event(ctx, "review.skipped",
-			telemetry.AnyToAttr("reason", skipReason),
-			telemetry.AnyToAttr("file.count", totalChanged),
-			telemetry.AnyToAttr("too_large.count", counts.TooLarge))
 	}
 
 	if len(a.diffs) == 0 {
@@ -360,7 +347,6 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 			fmt.Fprintf(stdout.Writer(), "[ocr] %d file(s) exceeded the token size limit; nothing left to review. Skipping review.\n", counts.TooLarge)
 		} else {
 			fmt.Fprintln(stdout.Writer(), "[ocr] No supported files changed. Skipping review.")
-			telemetry.Event(ctx, "no.files.changed")
 		}
 		// No item was ever selected: finalize yields a skipped manifest (no
 		// run_failure), which is the correct terminal state for "nothing to do".
@@ -377,10 +363,6 @@ func (a *Agent) Run(ctx context.Context) ([]model.LlmComment, error) {
 	}
 
 	a.currentDate = time.Now().Format("2006-01-02 15:04")
-	telemetry.Event(ctx, "review.started",
-		telemetry.AnyToAttr("file.count", totalChanged),
-		telemetry.AnyToAttr("review.count", reviewCount),
-		telemetry.AnyToAttr("repo.dir", a.args.RepoDir))
 
 	// Record file count metric.
 	telemetry.RecordFilesReviewed(ctx, int64(reviewCount))
@@ -743,8 +725,6 @@ dispatchLoop:
 						a.session.RecordReviewItemFailed(d.NewPath, d.OldPath, d.NewPath, fingerprint, fmt.Sprintf("panic: %v", r))
 					}
 					fmt.Fprintf(stdout.Writer(), "[ocr] Subtask panic for group %q: %v\n%s\n", g.Label, r, debug.Stack())
-					telemetry.ErrorEvent(ctx, "subtask.panic", fmt.Errorf("panic: %v", r),
-						telemetry.AnyToAttr("group.label", g.Label))
 					a.recordWarning("subtask_error", g.Label, fmt.Sprintf("panic: %v", r))
 				}
 			}()
@@ -768,8 +748,6 @@ dispatchLoop:
 					a.session.RecordReviewItemFailed(d.NewPath, d.OldPath, d.NewPath, fingerprint, err.Error())
 				}
 				fmt.Fprintf(stdout.Writer(), "[ocr] Subtask error for group %q: %v\n", g.Label, err)
-				telemetry.ErrorEvent(groupCtx, "subtask.error", err,
-					telemetry.AnyToAttr("group.label", g.Label))
 				a.recordWarning("subtask_error", g.Label, err.Error())
 				return
 			}
@@ -805,8 +783,6 @@ dispatchLoop:
 						atomic.AddInt64(&a.subtaskFailed, failedCount)
 						stopErr := errors.New(stop.checkpoint)
 						fmt.Fprintf(stdout.Writer(), "[ocr] Subtask error for group %q: %v\n", g.Label, stopErr)
-						telemetry.ErrorEvent(groupCtx, "subtask.error", stopErr,
-							telemetry.AnyToAttr("group.label", g.Label))
 						a.recordWarning("subtask_error", g.Label, stopErr.Error())
 					}
 				}
@@ -1334,11 +1310,6 @@ func (a *Agent) checkPromptBudget(ctx context.Context, messages []llm.Message, g
 	msg := fmt.Sprintf("prompt tokens (%d) exceed %d%% of max_tokens(%d) [round %d]", tokenCount, 80, maxAllowed, round)
 	fmt.Fprintf(stdout.Writer(), "[ocr] WARNING: %s for group %q\n", msg, groupKey)
 	a.recordWarning("token_threshold_exceeded", groupKey, msg)
-	telemetry.Event(ctx, "token.threshold.exceeded",
-		telemetry.AnyToAttr("group.label", groupKey),
-		telemetry.AnyToAttr("tokens", tokenCount),
-		telemetry.AnyToAttr("max_tokens", maxAllowed),
-		telemetry.AnyToAttr("round", round))
 	return &subtaskStop{
 		class:      session.FailureBudget,
 		reason:     "prompt exceeded the configured token budget",
@@ -1378,14 +1349,6 @@ func diffsChurn(diffs []model.Diff) (total, maxFile int64) {
 // class recorded at its trigger point. A completed review returns (true, nil, nil).
 func (a *Agent) executeGroupSubtask(ctx context.Context, g FileGroup) (bool, *subtaskStop, error) {
 	groupKey := fileGroupKey(g.Diffs)
-	ctx, span := telemetry.StartSpan(ctx, "subtask.execute.group."+groupKey)
-	defer span.End()
-
-	totalChanged, maxFileChanged := diffsChurn(g.Diffs)
-	telemetry.SetAttr(span, "group.label", groupKey)
-	telemetry.SetAttr(span, "group.file_count", len(g.Diffs))
-	telemetry.SetAttr(span, "lines.changed", totalChanged)
-	telemetry.SetAttr(span, "lines.changed.max_file", maxFileChanged)
 
 	if ctx.Err() != nil {
 		return false, nil, ctx.Err()
@@ -1413,20 +1376,11 @@ func (a *Agent) executeGroupSubtask(ctx context.Context, g FileGroup) (bool, *su
 		planResult, err = a.executeGroupPlanPhase(ctx, g, concatenatedDiffs, changeFilesExcludingGroup, rule)
 		if err != nil {
 			fmt.Fprintf(stdout.Writer(), "[ocr] Plan phase failed for group %q: %v (continuing without plan)\n", groupKey, err)
-			telemetry.Eventf(ctx, "plan.failed", err.Error(),
-				telemetry.AnyToAttr("group.label", groupKey))
 			planResult = ""
 		}
 	default:
 		fmt.Fprintf(stdout.Writer(), "[ocr] Skipping plan phase for group %q (%d file(s), max %d lines, total %d lines)\n",
 			groupKey, len(g.Diffs), maxFileChanged, totalChanged)
-		telemetry.Event(ctx, "plan.skipped",
-			telemetry.AnyToAttr("group.label", groupKey),
-			telemetry.AnyToAttr("group.file_count", len(g.Diffs)),
-			telemetry.AnyToAttr("lines.changed", totalChanged),
-			telemetry.AnyToAttr("lines.changed.max_file", maxFileChanged),
-			telemetry.AnyToAttr("threshold", a.args.Template.PlanModeLineThreshold),
-			telemetry.AnyToAttr("threshold.group", a.args.Template.PlanModeGroupLineThreshold))
 	}
 
 	// Phase 2: Main task loop (multi-round)
@@ -1481,14 +1435,8 @@ func (a *Agent) executeGroupSubtask(ctx context.Context, g FileGroup) (bool, *su
 		}
 
 		mainCompleted, mainStop, err := func() (bool, llmloop.MainLoopStop, error) {
-			ctx, mainSpan := telemetry.StartSpan(ctx, "main.loop")
-			defer mainSpan.End()
-			telemetry.SetAttr(mainSpan, "group.label", groupKey)
-			telemetry.SetAttr(mainSpan, "round", round)
 			completed, stop, err := a.runner.RunMainTask(ctx, messages, groupKey)
 			if err != nil {
-				mainSpan.SetStatus(codes.Error, err.Error())
-				mainSpan.RecordError(err)
 				return false, stop, err
 			}
 			return completed, stop, nil
@@ -1739,10 +1687,6 @@ func (a *Agent) resolveGroupSystemRule(diffs []model.Diff) string {
 
 // executeGroupPlanPhase runs the plan phase for a file group.
 func (a *Agent) executeGroupPlanPhase(ctx context.Context, g FileGroup, concatenatedDiffs, changeFiles, rule string) (string, error) {
-	ctx, span := telemetry.StartSpan(ctx, "plan.execute")
-	defer span.End()
-	telemetry.SetAttr(span, "group.label", g.Label)
-
 	pt := a.args.Template.PlanTask
 	messages := make([]llm.Message, 0, len(pt.Messages))
 	for _, m := range pt.Messages {
@@ -1764,7 +1708,6 @@ func (a *Agent) executeGroupPlanPhase(ctx context.Context, g FileGroup, concaten
 	startTime := time.Now()
 	reqCtx := llm.WithRequestMeta(ctx, a.newRequestMeta(gk, session.PlanTask, rec.RequestNo))
 
-	_, llmSpan := telemetry.StartLLMSpan(ctx, a.args.Model)
 	resp, err := a.args.LLMClient.CompletionsWithCtx(reqCtx, llm.ChatRequest{
 		Model:     a.args.Model,
 		Messages:  messages,
@@ -1772,19 +1715,13 @@ func (a *Agent) executeGroupPlanPhase(ctx context.Context, g FileGroup, concaten
 	})
 	duration := time.Since(startTime)
 	if err != nil {
-		telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-		llmSpan.End()
 		rec.SetError(err, duration)
-		span.SetStatus(codes.Error, err.Error())
-		span.RecordError(err)
 		return "", fmt.Errorf("plan request: %w", err)
 	}
 	var totalTokens int64
 	if resp.Usage != nil {
 		totalTokens = resp.Usage.TotalTokens
 	}
-	telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-	llmSpan.End()
 	rec.SetResponse(resp, duration)
 	a.runner.RecordUsage(resp.Usage)
 	fmt.Fprintf(stdout.Writer(), "[ocr] Plan completed for group %q\n", gk)
@@ -1797,9 +1734,6 @@ func (a *Agent) executeGroupPlanPhase(ctx context.Context, g FileGroup, concaten
 // comments for the group's paths are filtered (legacy full-group behavior).
 func (a *Agent) executeGroupReviewFilter(ctx context.Context, g FileGroup, from map[string]int) {
 	groupKey := fileGroupKey(g.Diffs)
-	ctx, span := telemetry.StartSpan(ctx, "review_filter.execute")
-	defer span.End()
-	telemetry.SetAttr(span, "group.label", groupKey)
 
 	ft := a.args.Template.ReviewFilterTask
 	if ft == nil || len(ft.Messages) == 0 {
@@ -1807,7 +1741,6 @@ func (a *Agent) executeGroupReviewFilter(ctx context.Context, g FileGroup, from 
 	}
 
 	if a.args.SkipFilter {
-		telemetry.SetAttr(span, "skipped", true)
 		fmt.Fprintf(stdout.Writer(), "[ocr] Review filter skipped for group %q (--no-filter)\n", groupKey)
 		return
 	}
@@ -1834,7 +1767,6 @@ func (a *Agent) executeGroupReviewFilter(ctx context.Context, g FileGroup, from 
 	if len(candidates) == 0 {
 		return
 	}
-	telemetry.SetAttr(span, "comments.before", len(candidates))
 
 	// Build the comment list for the filter prompt.
 	candidateComments := make([]model.LlmComment, len(candidates))
@@ -1860,7 +1792,6 @@ func (a *Agent) executeGroupReviewFilter(ctx context.Context, g FileGroup, from 
 	startTime := time.Now()
 	reqCtx := llm.WithRequestMeta(ctx, a.newRequestMeta(groupKey, session.ReviewFilterTask, rec.RequestNo))
 
-	_, llmSpan := telemetry.StartLLMSpan(ctx, a.args.Model)
 	resp, err := a.args.LLMClient.CompletionsWithCtx(reqCtx, llm.ChatRequest{
 		Model:     a.args.Model,
 		Messages:  messages,
@@ -1869,34 +1800,20 @@ func (a *Agent) executeGroupReviewFilter(ctx context.Context, g FileGroup, from 
 	})
 	duration := time.Since(startTime)
 	if err != nil {
-		telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-		llmSpan.End()
 		rec.SetError(err, duration)
 		fmt.Fprintf(stdout.Writer(), "[ocr] Review filter failed for group %q: %v\n", groupKey, err)
-		span.SetStatus(codes.Error, err.Error())
-		span.RecordError(err)
 		return
 	}
 	var totalTokens int64
 	if resp.Usage != nil {
 		totalTokens = resp.Usage.TotalTokens
 	}
-	telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-	llmSpan.End()
 	rec.SetResponse(resp, duration)
 	a.runner.RecordUsage(resp.Usage)
 
 	indices := parseFilterToolCalls(resp.ToolCalls(), len(candidates))
 	if indices == nil {
 		indices = parseFilterResponse(resp.Content(), len(candidates))
-	}
-	telemetry.SetAttr(span, "comments.filtered", len(indices))
-	if len(indices) == 0 {
-		telemetry.Event(ctx, "review_filter.completed",
-			attribute.String("group.label", groupKey),
-			attribute.Int("total_comments", len(candidates)),
-			attribute.Int("removed", 0))
-		return
 	}
 
 	// Map candidate indices to per-path removals using the true pathIdx.
@@ -1915,10 +1832,6 @@ func (a *Agent) executeGroupReviewFilter(ctx context.Context, g FileGroup, from 
 		a.args.CommentCollector.RemoveByPathAndIndices(path, idxSet)
 		totalRemoved += len(idxSet)
 	}
-	telemetry.Event(ctx, "review_filter.completed",
-		attribute.String("group.label", groupKey),
-		attribute.Int("total_comments", len(candidates)),
-		attribute.Int("removed", totalRemoved))
 	fmt.Fprintf(stdout.Writer(), "[ocr] Review filter removed %d comment(s) for group %q\n", totalRemoved, groupKey)
 }
 

@@ -151,7 +151,6 @@ make build
 │   ├── scan/             # Пофайловое ревью кода (ocr scan)
 │   ├── session/          # Управление сессиями ревью
 │   ├── stdout/           # Подменяемый writer для stdout
-│   ├── suggestdiff/      # Построчные diff для отрисовки предложений
 │   ├── telemetry/        # Интеграция с OpenTelemetry
 │   ├── tool/             # Встроенные инструменты (file_read, code_search и др.)
 │   └── viewer/           # WebUI-просмотрщик сессий

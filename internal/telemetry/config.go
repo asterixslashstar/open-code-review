@@ -12,20 +12,18 @@ import (
 )
 
 const (
-	defaultServiceName    = "open-code-review"
+	defaultServiceName = "open-code-review"
 	defaultOTLPEndpoint   = ""
 	defaultExporter       = "console"
-	defaultContentLogging = false
 )
 
 // Config holds resolved telemetry configuration.
 type Config struct {
 	Enabled      bool   // Master switch; false when OCR_ENABLE_TELEMETRY is unset
-	ServiceName  string // Service name in traces/metrics
+	ServiceName  string // Service name in metrics
 	Exporter     string // "console" or "otlp"
 	OTLPEndpoint string // OTLP collector address (grpc/http)
 	OTLPProtocol string // "grpc", "http/protobuf", "http/json"
-	ContentLog   bool   // Include prompt/response content in log events
 }
 
 // DefaultConfig returns a disabled default configuration.
@@ -56,9 +54,6 @@ func resolveEnv(cfg *Config) {
 	if v := os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"); v != "" {
 		cfg.OTLPProtocol = v
 	}
-	if os.Getenv("OCR_CONTENT_LOGGING") == "1" {
-		cfg.ContentLog = true
-	}
 }
 
 // telemetrySection matches the telemetry key in ~/.opencodereview/config.json.
@@ -66,7 +61,6 @@ type telemetrySection struct {
 	Enabled      *bool   `json:"enabled,omitempty"`
 	Exporter     *string `json:"exporter,omitempty"`
 	OTLPEndpoint *string `json:"otlp_endpoint,omitempty"`
-	ContentLog   *bool   `json:"content_logging,omitempty"`
 }
 
 // LoadFromJSON merges telemetry settings from a JSON config file if present.
@@ -101,9 +95,6 @@ func LoadFromJSON(cfg *Config, configPath string) error {
 		if cfg.Exporter == defaultExporter {
 			cfg.Exporter = "otlp"
 		}
-	}
-	if t.ContentLog != nil {
-		cfg.ContentLog = *t.ContentLog
 	}
 	return nil
 }

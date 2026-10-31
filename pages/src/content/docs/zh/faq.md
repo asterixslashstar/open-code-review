@@ -251,19 +251,11 @@ no-files 条件时会走这一路径。`ocr review` 在 manifest 构造失败且
 
 ### 怎么知道哪些 token 花了多少？
 
-启用遥测：
-
-```bash
-ocr config set telemetry.enabled true
-ocr config set telemetry.exporter console
-ocr review
-```
-
 主评审循环中的 LLM 调用会产生 `llm.request` span，同时记录为 metric。关注 `ocr.llm.tokens_used`
 （counter，标 `model` + `type`）、`ocr.llm.requests_total`（counter，标 `model`
 + `status`）、`ocr.llm.request_duration_seconds`（histogram，标 `model`）。
 console exporter 会内联打印这些聚合。如需仪表盘，切换到 OTLP exporter 并发到你的
-metrics 体系——见[遥测](../telemetry/)。
+metrics 体系。
 
 ### 为什么我的评审这么贵？
 
@@ -295,10 +287,6 @@ metrics 体系——见[遥测](../telemetry/)。
 
 OCR 把你的 **diff**（及可选 read-tool 片段）发到你配置的 LLM 端点。其余任何内容都不
 离开你的机器——会话 JSONL 与规则文件仅存于本地。
-
-若启用遥测，`content_logging` 标志已接入配置层但目前**不**控制任何代码路径——
-无论该标志值如何，prompt 与响应内容绝不导出到你的 collector。请视为保留位。生产
-环境保持 `false`。详情见[遥测](../telemetry/#content-logging)。
 
 ### 我能在发给 LLM 前脱敏 secret 吗？
 
@@ -344,4 +332,3 @@ OCR 不在 `~/.opencodereview` 之外写入（NPM 下载二进制除外），因
 - [配置](../configuration/)——LLM 端点解析与 config key。
 - [评审规则](../review-rules/)——文件过滤器与规则解析链。
 - [会话查看器](../viewer/)——查看历史评审会话。
-- [遥测](../telemetry/)——token 用量与 LLM 指标。

@@ -286,21 +286,6 @@ manifest-less no-files 경로는 더 간소해서 `summary`와 `manifest`를 모
 
 ### 토큰이 어디에 얼마나 쓰였는지 어떻게 알 수 있나요? {#how-can-i-tell-what-tokens-cost-what}
 
-텔레메트리를 켜세요.
-
-```bash
-ocr config set telemetry.enabled true
-ocr config set telemetry.exporter console
-ocr review
-```
-
-메인 리뷰 루프에서는 LLM 호출이 `llm.request` 스팬으로 기록되며 메트릭도 함께
-기록됩니다.
-`ocr.llm.tokens_used`(카운터, 레이블 `model` + `type`),
-`ocr.llm.requests_total`(카운터, 레이블 `model` + `status`),
-`ocr.llm.request_duration_seconds`(히스토그램, 레이블 `model`)를 보세요. console
-익스포터는 이 집계를 그 자리에 출력합니다. 대시보드로 보려면 OTLP 익스포터로
-바꿔 메트릭 스택으로 보내세요. [텔레메트리](../telemetry/)를 참고하세요.
 
 ### 리뷰 비용이 왜 이렇게 비싼가요? {#why-are-my-reviews-so-expensive}
 
@@ -342,11 +327,6 @@ ocr review
 OCR은 여러분의 **diff**(그리고 읽기 도구가 가져온 코드 조각)를 여러분이 설정한
 LLM 엔드포인트로 보냅니다. 그 밖에는 아무것도 컴퓨터를 떠나지 않습니다. 세션
 JSONL과 규칙 파일은 로컬에만 있습니다.
-
-텔레메트리를 켰다면, `content_logging` 플래그는 설정 계층에 배선만 돼 있고 지금은
-어떤 코드 경로도 제어하지 **않습니다**. 값이 무엇이든 프롬프트와 응답 내용은
-컬렉터로 내보내지 않습니다. 예약된 플래그로 여기시고 운영 환경에서는 `false`로
-두세요. 자세한 내용은 [텔레메트리](../telemetry/#content-logging)를 참고하세요.
 
 ### LLM에 보내기 전에 비밀 값을 가릴 수 있나요? {#can-i-redact-secrets-before-they-re-sent-to-the-llm}
 
@@ -397,4 +377,3 @@ OCR은 `~/.opencodereview` 바깥에 아무것도 쓰지 않습니다(NPM으로 
 - [설정](../configuration/) — LLM 엔드포인트 해석과 설정 키.
 - [리뷰 규칙](../review-rules/) — 파일 필터와 규칙 해석 체인.
 - [세션 뷰어](../viewer/) — 지난 리뷰 세션 들여다보기.
-- [텔레메트리](../telemetry/) — 토큰 사용량과 LLM 메트릭.

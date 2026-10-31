@@ -265,9 +265,6 @@ JSONL 기록에는 LLM에 보내고 받은 **모든 것**이 들어 있습니다
 - CI에서 `--audience agent --format json` 출력을 임시 파이프로 흘려보내고
   `HOME`을 임시 디렉터리로 잡아 JSONL이 아예 남지 않게 합니다.
 
-OpenTelemetry 익스포터는 별개의 문제입니다. 내보내는 트레이스에 프롬프트 내용이
-섞이지 않게 하는 방법은 [텔레메트리](../telemetry/)를 참고하세요.
-
 ## 뷰어가 답이 아닐 때 {#when-the-viewer-is-not-the-right-tool}
 
 - 프로그램으로 후처리할 때(CI, 대시보드)는

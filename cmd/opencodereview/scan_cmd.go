@@ -20,8 +20,6 @@ import (
 	"github.com/alibaba/open-code-review/internal/telemetry"
 	"github.com/alibaba/open-code-review/internal/tool"
 	"github.com/spf13/cobra"
-
-	"go.opentelemetry.io/otel/codes"
 )
 
 type scanOptions struct {
@@ -237,21 +235,10 @@ func executeScanContext(ctx context.Context, opts scanOptions) (retErr error) {
 	q := newQuietHandle(opts.outputFormat, opts.audience)
 	defer q.Restore()
 
-	ctx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(ctx), "scan.run")
-	defer span.End()
-	var traceID string
-	if telemetry.IsEnabled() {
-		traceID = telemetry.TraceIDFromContext(ctx)
-		if !isMachineReadable(opts.outputFormat) {
-			fmt.Fprintf(os.Stderr, "[ocr] TraceID: %s\n", traceID)
-		}
-	}
 	startTime := time.Now()
 
 	comments, err := ag.Run(ctx)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		span.RecordError(err)
 		if id := ag.SessionID(); id != "" {
 			fmt.Fprintf(os.Stderr, "[ocr] Session: %s (retry with: --resume %s)\n", id, id)
 		}

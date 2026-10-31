@@ -60,7 +60,6 @@ func ReLocateComment(
 	}
 
 	startTime := time.Now()
-	_, llmSpan := telemetry.StartLLMSpan(ctx, modelName)
 	resp, err := client.CompletionsWithCtx(ctx, llm.ChatRequest{
 		Model:     modelName,
 		Messages:  messages,
@@ -68,8 +67,6 @@ func ReLocateComment(
 	})
 	duration := time.Since(startTime)
 	if err != nil {
-		telemetry.RecordLLMResult(llmSpan, duration, 0, err)
-		llmSpan.End()
 		fmt.Fprintf(stdout.Writer(), "[ocr] Re-location LLM call failed for %s: %v\n", cm.Path, err)
 		return false, nil
 	}
@@ -77,8 +74,6 @@ func ReLocateComment(
 	if resp.Usage != nil {
 		totalTokens = resp.Usage.TotalTokens
 	}
-	telemetry.RecordLLMResult(llmSpan, duration, totalTokens, nil)
-	llmSpan.End()
 
 	code := extractCodeBlock(resp.Content())
 	if code == "" {
