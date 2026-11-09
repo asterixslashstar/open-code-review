@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	defaultServiceName = "open-code-review"
-	defaultOTLPEndpoint   = ""
-	defaultExporter       = "console"
+	defaultServiceName     = "open-code-review"
+	defaultOTLPEndpoint    = ""
+	defaultExporter        = "console"
+	defaultContentLogging  = false
 )
 
 // Config holds resolved telemetry configuration.
@@ -24,6 +25,7 @@ type Config struct {
 	Exporter     string // "console" or "otlp"
 	OTLPEndpoint string // OTLP collector address (grpc/http)
 	OTLPProtocol string // "grpc", "http/protobuf", "http/json"
+	ContentLog   bool   // Whether to log request/response content (default: false)
 }
 
 // DefaultConfig returns a disabled default configuration.
